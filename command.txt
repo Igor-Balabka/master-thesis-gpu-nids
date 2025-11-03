@@ -1,0 +1,13 @@
+
+
+---- Compiler le code Cuda ----
+nvcc -c "file".cu -o "cuda".o
+
+---- Compiler le code C ----
+gcc -c "file".c -o 'c".o
+
+---- Link both file to create an execute ----
+gcc "cuda".o "c".o -o "compiled_name" -L/usr/local/cuda/lib64 -lcudart
+
+---- Execute the program ----
+./"compiled_name"
