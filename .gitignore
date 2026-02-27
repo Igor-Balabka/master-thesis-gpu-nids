@@ -1,0 +1,5 @@
+# Ignorer les captures de paquets réseau
+*.pcap
+
+# Ignorer les fichiers binaires
+*.bin
