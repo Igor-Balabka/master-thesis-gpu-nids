@@ -10,6 +10,7 @@
 #define DEFAULT_DATA     "./Data/data.bin"
 #define DEFAULT_LOOPS    1
 #define DEFAULT_THREADS  4
+#define PACKET_SIZE      1500 // Simulation MTU
 
 int main(int argc, char** argv) {
     
@@ -37,44 +38,51 @@ int main(int argc, char** argv) {
     long matches = 0;
     unsigned long long total_bytes = (unsigned long long)data_len * loops;
 
+    // --- Préparation des structures de paquets (commune au CPU et GPU) ---
+    int num_packets = data_len / PACKET_SIZE;
+    if (num_packets == 0) num_packets = 1;
+
+    long *offsets = (long*)malloc(num_packets * sizeof(long));
+    int *lengths = (int*)malloc(num_packets * sizeof(int));
+
+    for(int i = 0; i < num_packets; i++) {
+        offsets[i] = (long)i * PACKET_SIZE;
+        if (i == num_packets - 1) {
+            lengths[i] = (int)(data_len - offsets[i]);
+        } else {
+            lengths[i] = PACKET_SIZE;
+        }
+    }
+
     if (strcmp(mode, "gpu") == 0) {
-        printf("\n--- 3. Starting Benchmark (CUDA GPU) ---\n");
-        // On appelle la fonction C++ CUDA
-        time_total = run_gpu_benchmark(nids, payload, data_len, loops, &matches);
-        
+        printf("\n--- 3. Starting Benchmark (CUDA GPU - Packet Mode) ---\n");
+        // CORRECTION : On récupère le temps de retour
+        time_total = run_gpu_packet_benchmark(nids, payload, offsets, lengths, num_packets, loops, &matches);
+                
     } else {
-        printf("\n--- 3. Starting Benchmark (OpenMP CPU Data-Parallel) ---\n");
+        printf("\n--- 3. Starting Benchmark (OpenMP CPU - Packet Mode) ---\n");
         omp_set_num_threads(num_threads);
         double start_time = omp_get_wtime();
 
-        for (int i = 0; i < loops; i++) {
+        for (int l = 0; l < loops; l++) {
             long loop_matches = 0;
 
-            // On parallélise le découpage du fichier (comme les blocs CUDA !)
+            // Parallélisation au niveau des paquets pour éviter les pertes de matches
             #pragma omp parallel reduction(+:loop_matches)
             {
                 int tid = omp_get_thread_num();
                 int nthreads = omp_get_num_threads();
 
-                // Calcul des frontières (Chunks) pour ce thread
-                long chunk_size = (data_len + nthreads - 1) / nthreads;
-                long start = tid * chunk_size;
-                long end = start + chunk_size;
-                if (end > data_len) end = data_len;
+                for (int i = tid; i < num_packets; i += nthreads) {
+                    int state = 0;
+                    long start_off = offsets[i];
+                    int p_len = lengths[i];
 
-                if (start < data_len) {
-                    int current_state = 0;
-                    long local_matches = 0;
-                    
-                    // Ce thread ne lit QUE sa portion des 4 Go
-                    for (long j = start; j < end; ++j) {
-                        unsigned char ch = (unsigned char)payload[j];
-                        current_state = nids->transition_table[current_state * 256 + ch];
-                        if (nids->output_counts[current_state] > 0) {
-                            local_matches += nids->output_counts[current_state];
-                        }
+                    for (int j = 0; j < p_len; j++) {
+                        unsigned char ch = (unsigned char)payload[start_off + j];
+                        state = nids->transition_table[state * 256 + ch];
+                        loop_matches += nids->output_counts[state];
                     }
-                    loop_matches += local_matches;
                 }
             }
             matches += loop_matches;
@@ -84,16 +92,20 @@ int main(int argc, char** argv) {
         time_total = end_time - start_time;
     }
 
-    // 5. Statistics
-    double throughput_mbps = ((double)total_bytes * 8) / (time_total * 1000000);
+    // 5. Statistics (Gbps est plus parlant pour ton projet)
+    double throughput_gbps = ((double)total_bytes * 8) / (time_total * 1000000000.0);
 
     printf("--------------------------------\n");
     printf("Mode             : %s\n", mode);
     printf("Time elapsed     : %.4f seconds\n", time_total);
     printf("Total matches    : %ld\n", matches);
-    printf("Throughput       : %.2f Mbps\n", throughput_mbps);
+    printf("Throughput       : %.2f Gbps\n", throughput_gbps);
     printf("--------------------------------\n");
 
+    // Nettoyage
+    free(offsets);
+    free(lengths);
+    // free(payload); // Utilise cudaFreeHost(payload) si tu passes en Pinned Memory plus tard
     free(payload);
     ac_free(nids);
     return 0;

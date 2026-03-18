@@ -8,7 +8,13 @@
 extern "C" {
 #endif
 
-double run_gpu_benchmark(const AC_Machine *m, const char *payload, long data_len, int loops, long *out_matches);
+double run_gpu_packet_benchmark(const AC_Machine *m, 
+                                const char *payload, 
+                                long *packet_offsets, 
+                                int *packet_lengths, 
+                                int num_packets, 
+                                int loops, 
+                                long *out_matches);
 
 #ifdef __cplusplus
 }
