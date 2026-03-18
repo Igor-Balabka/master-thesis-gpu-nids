@@ -7,23 +7,16 @@ CFLAGS = -O3 -fopenmp
 NVFLAGS = -O3 -arch=sm_86 -Xcompiler -fopenmp
 CUDA_LDFLAGS = -lcudart -Xcompiler -fopenmp
 
-# Paramètres par défaut pour l'exécution
+# Paramètres par défaut
 THREADS = 12
 LOOPS   = 1
 RULES   = ./Rules/patterns.txt
 DATA    = ./Data/data.bin
 
-# Dossiers
-OBJ_DIR = obj
-
 # Fichiers sources
 SRCS_C = main.c ac.c utils.c
 SRCS_CU = gpu_ac.cu
-SRCS_TEST = test_nids.c
-
-# Fichiers objets
-OBJS = $(SRCS_C:%.c=$(OBJ_DIR)/%.o) $(SRCS_CU:%.cu=$(OBJ_DIR)/%.o)
-TEST_OBJS = $(OBJ_DIR)/ac.o $(OBJ_DIR)/utils.o $(OBJ_DIR)/gpu_ac.o $(OBJ_DIR)/test_nids.o
+SRCS_TEST = test_nids.c ac.c utils.c gpu_ac.cu
 
 # Exécutables
 TARGET = framework_nids
@@ -31,41 +24,41 @@ TEST_TARGET = run_tests
 
 # --- RÈGLES DE COMPILATION ---
 
-all: $(OBJ_DIR) $(TARGET)
+# Compilation directe : On donne tous les .c et .cu à NVCC d'un coup
+$(TARGET): $(SRCS_C) $(SRCS_CU)
+	@echo "🚀 Compilation directe en cours (sans fichiers .o)..."
+	$(NVCC) $(NVFLAGS) $(SRCS_C) $(SRCS_CU) -o $(TARGET) $(CUDA_LDFLAGS)
+	@echo "✅ SUCCESS: $(TARGET) prêt."
 
-$(TARGET): $(OBJS)
-	$(NVCC) $(NVFLAGS) -o $(TARGET) $(OBJS) $(CUDA_LDFLAGS)
-	@echo "SUCCESS: $(TARGET) prêt."
+all: $(TARGET)
 
 # --- RÈGLES D'EXÉCUTION RAPIDE ---
 
-# Lance le code en mode GPU
 gpu: $(TARGET)
 	./$(TARGET) gpu $(THREADS) $(LOOPS) $(RULES) $(DATA)
 
-# Lance le code en mode CPU
+gpu_async: $(TARGET)
+	./$(TARGET) gpu_async $(THREADS) $(LOOPS) $(RULES) $(DATA)
+
 cpu: $(TARGET)
 	./$(TARGET) cpu $(THREADS) $(LOOPS) $(RULES) $(DATA)
 
-# --- TESTS ET CLEAN ---
+# --- TESTS ---
 
-test: $(OBJ_DIR) $(TEST_OBJS)
-	$(NVCC) $(NVFLAGS) -o $(TEST_TARGET) $(TEST_OBJS) $(CUDA_LDFLAGS)
+# On compile le test en une ligne aussi
+test: $(SRCS_TEST)
+	@echo "🧪 Compilation des tests..."
+	$(NVCC) $(NVFLAGS) $(SRCS_TEST) -o $(TEST_TARGET) $(CUDA_LDFLAGS)
 	@echo "-------------------------------------------"
 	@echo "Running Unit Tests..."
 	./$(TEST_TARGET)
 	@echo "-------------------------------------------"
+	rm -f $(TEST_TARGET)
 
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
-
-$(OBJ_DIR)/%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJ_DIR)/%.o: %.cu
-	$(NVCC) $(NVFLAGS) -c $< -o $@
+# --- CLEAN ---
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_TARGET)
+	rm -f $(TARGET) $(TEST_TARGET)
+	@echo "🧹 Nettoyage terminé."
 
-.PHONY: all clean test gpu cpu
+.PHONY: all clean test gpu cpu gpu_async

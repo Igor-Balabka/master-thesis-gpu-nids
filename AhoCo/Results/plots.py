@@ -1,81 +1,110 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
+import os
 
-# Configuration pour un style "Académique" (propre, lisible en noir et blanc ou couleur)
-plt.style.use('seaborn-v0_8-whitegrid')
-plt.rcParams.update({'font.size': 12, 'font.family': 'sans-serif'})
+# --- Academic Vector Settings ---
+plt.rcParams.update({
+    'font.size': 12,
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 1.5,
+    'grid.color': '#B0B0B0', # Grille un peu plus sombre pour la projection
+    'grid.alpha': 0.6,
+    'grid.linestyle': '--',
+    'figure.autolayout': True,
+    'svg.fonttype': 'none', # Garde le texte éditable dans PowerPoint
+    'pdf.fonttype': 42
+})
 
-def generate_graphs(csv_file):
-    print(f"📊 Chargement des données depuis {csv_file}...")
-    
-    # Lecture du CSV
-    try:
-        df = pd.read_csv(csv_file)
-    except FileNotFoundError:
-        print(f"❌ Erreur: Le fichier {csv_file} est introuvable. Lance d'abord le script Bash !")
+def save_plot(name):
+    """Sauvegarde en deux formats vectoriels d'un coup"""
+    plt.savefig(f"{name}.pdf", format='pdf')
+    plt.savefig(f"{name}.svg", format='svg')
+    print(f"✅ Saved: {name}.svg & .pdf")
+
+def generate_all_assets(csv_file):
+    if not os.path.exists(csv_file):
+        print(f"❌ Error: {csv_file} not found.")
         return
 
-    # Nettoyage des données
-    # On convertit les colonnes en numériques (en forçant les 'N/A' en NaN)
-    df['CPU_Threads'] = pd.to_numeric(df['CPU_Threads'], errors='coerce')
-    df['GPU_ThreadsPerBlock'] = pd.to_numeric(df['GPU_ThreadsPerBlock'], errors='coerce')
-    df['GPU_Blocks'] = pd.to_numeric(df['GPU_Blocks'], errors='coerce')
+    df = pd.read_csv(csv_file)
     
-    # Conversion du Throughput de Mbps vers Gbps (plus lisible pour des gros scores)
-    df['Throughput_Gbps'] = df['Throughput_Mbps'] / 1000.0
+    # Cleaning & Numeric Conversion
+    for col in ['Throughput_Gbps', 'Block_Size', 'Grid_Size', 'Param_Value']:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # ==========================================
-    # GRAPHIQUE 1 : CPU SCALING (Courbe)
-    # ==========================================
-    df_cpu = df[df['Mode'] == 'cpu'].sort_values(by='CPU_Threads')
-    
+    # Data Splits
+    df_cpu = df[df['Mode'] == 'cpu'].sort_values('Param_Value')
+    df_sync = df[df['Mode'] == 'gpu'].sort_values(['Block_Size', 'Grid_Size'])
+    df_async = df[df['Mode'] == 'gpu_async'].sort_values(['Block_Size', 'Grid_Size'])
+
+    # 1. GPU ASYNC SCALABILITY (The Star of your Presentation)
+    if not df_async.empty:
+        plt.figure(figsize=(10, 6))
+        sns.lineplot(data=df_async, x='Grid_Size', y='Throughput_Gbps', hue='Block_Size', 
+                     palette='bright', marker='o', markersize=8, linewidth=2.5)
+        plt.title('GPU Asynchronous Performance vs. Grid Configuration', fontweight='bold')
+        plt.xlabel('Grid Size (Number of CUDA Blocks)')
+        plt.ylabel('Throughput (Gbps)')
+        plt.xscale('log', base=2)
+        plt.grid(True, which="both")
+        xticks = sorted(df_async['Grid_Size'].unique())
+        plt.xticks(xticks, xticks)
+        plt.legend(title='Threads per Block', frameon=True, shadow=True)
+        save_plot('01_GPU_Async_Scalability')
+        plt.close()
+
+    # 2. HEATMAP SYNC
+    if not df_sync.empty:
+        plt.figure(figsize=(10, 8))
+        pivot_sync = df_sync.pivot_table(index='Block_Size', columns='Grid_Size', values='Throughput_Gbps')
+        sns.heatmap(pivot_sync, annot=True, fmt=".2f", cmap="YlGnBu", cbar_kws={'label': 'Gbps'})
+        plt.title('Heatmap: GPU Synchronous Throughput', fontweight='bold')
+        save_plot('02_Heatmap_Sync')
+        plt.close()
+
+    # 3. HEATMAP ASYNC
+    if not df_async.empty:
+        plt.figure(figsize=(10, 8))
+        pivot_async = df_async.pivot_table(index='Block_Size', columns='Grid_Size', values='Throughput_Gbps')
+        sns.heatmap(pivot_async, annot=True, fmt=".2f", cmap="YlGnBu", cbar_kws={'label': 'Gbps'})
+        plt.title('Heatmap: GPU Asynchronous Throughput', fontweight='bold')
+        save_plot('03_Heatmap_Async')
+        plt.close()
+
+    # 4. STABILITY BOXPLOT
+    plt.figure(figsize=(10, 6))
+    gpu_only = df[df['Mode'].isin(['gpu', 'gpu_async'])].copy()
+    gpu_only['Mode'] = gpu_only['Mode'].replace({'gpu': 'Sync', 'gpu_async': 'Async'})
+    sns.boxplot(data=gpu_only, x='Mode', y='Throughput_Gbps', hue='Mode', palette='Set2', legend=False)
+    plt.title('Throughput Stability: Sync vs Async', fontweight='bold')
+    plt.grid(True, axis='y')
+    save_plot('04_Stability_Boxplot')
+    plt.close()
+
+    # 5. CPU SCALABILITY
     if not df_cpu.empty:
         plt.figure(figsize=(8, 5))
-        plt.plot(df_cpu['CPU_Threads'], df_cpu['Throughput_Gbps'], 
-                 marker='o', linewidth=2, markersize=8, color='#1f77b4')
-        
-        plt.title('Performance du NIDS sur CPU (OpenMP)', fontsize=14, fontweight='bold')
-        plt.xlabel('Nombre de Threads', fontsize=12)
-        plt.ylabel('Débit (Gbps)', fontsize=12)
-        
-        # Forcer l'axe X à n'afficher que des entiers
-        plt.xticks(df_cpu['CPU_Threads']) 
-        plt.ylim(bottom=0) # Toujours commencer l'axe Y à 0 pour être honnête
-        
-        plt.tight_layout()
-        plt.savefig('cpu_scaling_plot.png', dpi=300) # dpi=300 pour la haute qualité
-        print("✅ Graphique CPU généré : cpu_scaling_plot.png")
+        plt.plot(df_cpu['Param_Value'], df_cpu['Throughput_Gbps'], color='red', marker='D', linewidth=2)
+        plt.title('CPU Multithreading Efficiency', fontweight='bold')
+        plt.xlabel('Number of Threads')
+        plt.ylabel('Throughput (Gbps)')
+        plt.grid(True)
+        save_plot('05_CPU_Scalability')
         plt.close()
 
-    # ==========================================
-    # GRAPHIQUE 2 : GPU HEATMAP (Carte de chaleur)
-    # ==========================================
-    df_gpu = df[df['Mode'] == 'gpu']
-    
-    if not df_gpu.empty:
-        # On crée une matrice 2D (Lignes = Threads, Colonnes = Blocs)
-        pivot_gpu = df_gpu.pivot(index="GPU_ThreadsPerBlock", 
-                                 columns="GPU_Blocks", 
-                                 values="Throughput_Gbps")
-        
-        plt.figure(figsize=(9, 6))
-        # Utilisation de Seaborn pour une belle Heatmap
-        sns.heatmap(pivot_gpu, annot=True, fmt=".1f", cmap="YlOrRd", 
-                    cbar_kws={'label': 'Débit (Gbps)'}, linewidths=.5)
-        
-        plt.title('Grid Search GPU CUDA (Débit en Gbps)', fontsize=14, fontweight='bold')
-        plt.xlabel('Nombre de Blocs', fontsize=12)
-        plt.ylabel('Threads par Bloc', fontsize=12)
-        
-        # Inverser l'axe Y pour avoir les petites valeurs en bas
-        plt.gca().invert_yaxis()
-        
-        plt.tight_layout()
-        plt.savefig('gpu_heatmap_plot.png', dpi=300)
-        print("✅ Graphique GPU généré : gpu_heatmap_plot.png")
-        plt.close()
+    # 6. FINAL COMPARISON
+    plt.figure(figsize=(10, 6))
+    best = df.groupby('Mode')['Throughput_Gbps'].max().sort_values().reset_index()
+    best['Mode'] = best['Mode'].replace({'cpu': 'CPU', 'gpu': 'GPU Sync', 'gpu_async': 'GPU Async'})
+    ax = sns.barplot(data=best, x='Mode', y='Throughput_Gbps', hue='Mode', palette='viridis', legend=False)
+    plt.title('Peak Performance Comparison', fontweight='bold')
+    plt.grid(True, axis='y')
+    for p in ax.patches:
+        ax.annotate(f'{p.get_height():.2f}', (p.get_x() + p.get_width()/2., p.get_height()),
+                    ha='center', va='bottom', fontweight='bold', xytext=(0, 5), textcoords='offset points')
+    save_plot('06_Final_Comparison')
+    plt.close()
 
 if __name__ == "__main__":
-    generate_graphs("benchmark_results.csv")
+    generate_all_assets("benchmark_results.csv")

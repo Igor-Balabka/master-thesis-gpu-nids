@@ -3,20 +3,32 @@
 #include <string.h>
 #include "ac.h"
 #include "utils.h"
+#include <cuda_runtime.h>
 
 // Loads the entire file content into memory
 char* load_file(const char* filename, long* length) {
     FILE* f = fopen(filename, "rb");
-    if (!f) { perror("Error reading data file"); exit(1); }
+    if (!f) { perror("Error opening data file"); exit(1); }
     
     fseek(f, 0, SEEK_END);
     *length = ftell(f);
     fseek(f, 0, SEEK_SET);
     
-    char* buffer = (char*)malloc(*length + 1);
-    if (!buffer) { perror("Malloc failed"); exit(1); }
+    char* buffer = NULL;
+    // cudaHostAlloc allows for faster PCIe transfers (GPU) 
+    // and standard pointer access (CPU).
+    cudaError_t err = cudaHostAlloc((void**)&buffer, *length + 1, cudaHostAllocDefault);
+    if (err != cudaSuccess) {
+        fprintf(stderr, "Fatal: cudaHostAlloc failed. Is a GPU driver installed?\n");
+        exit(1);
+    }
     
-    fread(buffer, 1, *length, f);
+    if (fread(buffer, 1, *length, f) != (size_t)*length) {
+        fprintf(stderr, "Error: Could not read file content.\n");
+        cudaFreeHost(buffer);
+        exit(1);
+    }
+    
     buffer[*length] = '\0';
     fclose(f);
     return buffer;
