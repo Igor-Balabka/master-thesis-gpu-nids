@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
              
     } else {
         printf("\n--- Starting OpenMP CPU Benchmark ---\n");
-        printf("Parallelism : %d Threads (OMP_NUM_THREADS)\n", num_threads);
+        printf("Parallelism : %d Threads\n", num_threads);
         
         omp_set_num_threads(num_threads);
         double start_time = omp_get_wtime();
