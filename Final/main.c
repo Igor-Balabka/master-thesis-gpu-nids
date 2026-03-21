@@ -13,7 +13,7 @@
 #define DEFAULT_THREADS    4
 #define DEFAULT_BLOCK_SIZE 256
 #define MAX_BATCH_PKTS     1000000
-#define BATCH_SIZE_500MB   (500ULL * 1024 * 1024)
+#define BATCH_SIZE_500MB   (1000ULL * 1024 * 1024)
 
 // --- Function Prototypes ---
 void load_patterns_from_file(AC_Machine *m, const char *filename);
@@ -44,16 +44,47 @@ long run_cpu_benchmark(AC_Machine *m, char *payload, PacketData *meta, int num_p
 // --- 2. GPU Logic (Template with Internal Timer) ---
 long run_gpu_benchmark(AC_Machine *m, char *h_payload, PacketData *h_meta, int num_pkts, int blockSize, int gridSize, double *pure_time) {
     long matches = 0;
-    int current_grid = (gridSize > 0) ? gridSize : (num_pkts + blockSize - 1) / blockSize;
+    
+    // Arrays needed by your run_classic_packet_benchmark function
+    // We use static to allocate only once and reuse the memory across batches
+    static long *batch_offsets = NULL;
+    static int *batch_lengths = NULL;
+    static int current_capacity = 0;
 
-    // In the future, you will wrap the cudaMemcpy + Kernel here
+    // Reallocate only if the current batch is larger than our previous maximum
+    if (num_pkts > current_capacity) {
+        if (batch_offsets) free(batch_offsets);
+        if (batch_lengths) free(batch_lengths);
+        batch_offsets = (long*)malloc(num_pkts * sizeof(long));
+        batch_lengths = (int*)malloc(num_pkts * sizeof(int));
+        current_capacity = num_pkts;
+    }
+
+    // Prepare the simplified arrays from the h_meta struct
+    #pragma omp parallel for // Parallelize the copy to be even faster
+    for (int i = 0; i < num_pkts; i++) {
+        batch_offsets[i] = h_meta[i].offset;
+        batch_lengths[i] = h_meta[i].length;
+    }
+
+    // --- CALL YOUR CUDA KERNEL WRAPPER ---
+    // Your run_classic_packet_benchmark already contains internal timing with cudaEvents
+    // It returns the execution time in seconds (double)
     double start = omp_get_wtime();
-    
-    // [PLACEHOLDER FOR CUDA KERNEL]
-    
+    double kernel_time = run_classic_packet_benchmark(
+        m, 
+        h_payload, 
+        batch_offsets, 
+        batch_lengths, 
+        num_pkts, 
+        1,       // loops = 1
+        &matches // will store the total matches found in this batch
+    );
+
+    // Update the pure matching time shared variable
     *pure_time += (omp_get_wtime() - start);
     
-    return matches; 
+    return matches;
 }
 
 // --- 3. Rules Loader ---
