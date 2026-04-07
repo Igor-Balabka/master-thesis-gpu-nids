@@ -90,3 +90,23 @@ void free_pcap_store(PcapDataStore *pcapData){
         free(pcapData);
     }
 }
+
+
+int packetMemoryManager(pcap_t *handle, char *payload, PacketData *meta, int max_pkts, size_t max_bytes) {
+    struct pcap_pkthdr *h;
+    const u_char *pkt;
+    int count = 0;
+    size_t current_offset = 0;
+
+    while (count < max_pkts && pcap_next_ex(handle, &h, &pkt) == 1) {
+        if (current_offset + h->caplen > max_bytes) break;
+        
+        memcpy(payload + current_offset, pkt, h->caplen);
+        meta[count].offset = current_offset;
+        meta[count].length = h->caplen;
+        
+        current_offset += h->caplen;
+        count++;
+    }
+    return count;
+}
