@@ -5,7 +5,6 @@
 #include "ac_classic.h"
 #include "cuda_utils.h"
 
-// Utilisation de const et __restrict__ pour aider le compilateur à optimiser
 __global__ void ac_classic_kernel(
     const int * __restrict__ d_table, 
     const int * __restrict__ d_output_counts, 
@@ -18,7 +17,6 @@ __global__ void ac_classic_kernel(
     long tid = (long)blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= num_packets) return;
 
-    // Utilisation de unsigned long pour correspondre aux offsets du PCAP
     unsigned long start = d_packet_start[tid];
     int len = d_packet_lengths[tid];
     

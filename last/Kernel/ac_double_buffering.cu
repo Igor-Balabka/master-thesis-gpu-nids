@@ -45,7 +45,6 @@ double run_buffering_packet_benchmark(
     unsigned long *d_packet_start;
     long *d_results;
 
-    // --- SÉCURITÉ 64-BIT ---
     size_t last_pkt_idx = (size_t)num_packets - 1;
     size_t total_data_size = (size_t)packet_start[last_pkt_idx] + (size_t)packet_lengths[last_pkt_idx];
 
@@ -81,7 +80,6 @@ double run_buffering_packet_benchmark(
     CUDA_CHECK(cudaMemcpy(d_payload, payload, total_data_size, cudaMemcpyHostToDevice));
 
     for (int l = 0; l < loops; l++) {
-        // Remise à zéro propre des résultats
         cudaMemsetAsync(d_results, 0, (size_t)num_packets * sizeof(long), streams[0]);
         cudaStreamSynchronize(streams[0]);
 
@@ -108,7 +106,6 @@ cudaEventSynchronize(stop_ev);
     float ms = 0;
     cudaEventElapsedTime(&ms, start_ev, stop_ev);
 
-    // Récupération finale
     long *h_results = (long*)malloc((size_t)num_packets * sizeof(long));
     CUDA_CHECK(cudaMemcpy(h_results, d_results, (size_t)num_packets * sizeof(long), cudaMemcpyDeviceToHost));
     

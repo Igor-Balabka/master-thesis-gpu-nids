@@ -19,7 +19,7 @@ void print_gpu_specs() {
     printf("\n  Compute Capability    : %d.%d", props.major, props.minor);
     printf("\n  Total Global Memory   : %.2f GB", (float)props.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
     printf("\n  Multiprocessors (SM)  : %d", props.multiProcessorCount);
-    printf("\n  Shared Mem per Block  : %zu KB", props.sharedMemPerBlock / 1024); // Ajout intéressant
+    printf("\n  Shared Mem per Block  : %zu KB", props.sharedMemPerBlock / 1024); 
     printf("\n  L2 Cache Size         : %d KB", props.l2CacheSize / 1024);
     printf("\n==================================================\n\n");
 }
