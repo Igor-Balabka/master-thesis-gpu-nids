@@ -42,7 +42,7 @@ clean:
 	@echo "✨ Dossier propre."
 
 benchmark: $(TARGET)
-	./run_benchmark.sh
+	sudo ./run_benchmark.sh
 
 # N'oublie pas d'ajouter gpu_async ici !
 .PHONY: all clean gpu gpu_async cpu

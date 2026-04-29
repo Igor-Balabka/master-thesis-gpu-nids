@@ -5,7 +5,7 @@
 #include "ac_double_buffering.h"
 #include "cuda_utils.h"
 
-#define N_SLOTS 8
+
 
 __global__ void ac_buffering_kernel(
     const int * __restrict__ d_table, 
@@ -39,7 +39,7 @@ extern "C" {
 double run_buffering_packet_benchmark(
     const AC_Machine *m, const char *payload, unsigned long *packet_start, 
     int *packet_lengths, int num_packets, int loops, long *out_matches, 
-    int threads_per_block, int batch_size) 
+    int threads_per_block, int batch_size, int n_slots) 
 {
     if (num_packets <= 0) return 0.0;
 
@@ -69,9 +69,8 @@ double run_buffering_packet_benchmark(
     CUDA_CHECK(cudaMemcpy(d_packet_start, packet_start, (size_t)num_packets * sizeof(unsigned long), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_packet_lengths, packet_lengths, (size_t)num_packets * sizeof(int), cudaMemcpyHostToDevice));    
 
-    cudaStream_t streams[N_SLOTS];
-    for (size_t i = 0; i < N_SLOTS; i++)
-    {
+    cudaStream_t *streams = (cudaStream_t*)malloc(n_slots * sizeof(cudaStream_t));
+    for (int i = 0; i < n_slots; i++) {
         cudaStreamCreate(&streams[i]);
     }
 
@@ -93,7 +92,7 @@ double run_buffering_packet_benchmark(
         
 
         for (int i = 0; i < num_packets; i += batch_size) { 
-            int s = (i / batch_size) % N_SLOTS; 
+            int s = (i / batch_size) % n_slots; 
             int n_pkts = (i + batch_size > num_packets) ? (num_packets - i) : batch_size;
 
             unsigned long batch_offset = packet_start[i];
@@ -115,7 +114,7 @@ double run_buffering_packet_benchmark(
             d_results + i
         );
         }
-        cudaDeviceSynchronize();
+        //cudaDeviceSynchronize();
         // cudaStreamSynchronize(streams[0]);
         // cudaStreamSynchronize(streams[1]);
     }
@@ -140,7 +139,10 @@ cudaEventSynchronize(stop_ev);
     cudaFree(d_table); cudaFree(d_output_counts);
     cudaFree(d_payload); cudaFree(d_packet_start);
     cudaFree(d_packet_lengths); cudaFree(d_results);
-    cudaStreamDestroy(streams[0]); cudaStreamDestroy(streams[1]);
+    for (int i = 0; i < n_slots; i++) {
+        cudaStreamDestroy(streams[i]);
+    }
+    free(streams);
     cudaEventDestroy(start_ev); cudaEventDestroy(stop_ev);
 
     return (double)ms / 1000.0 / loops;

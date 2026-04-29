@@ -26,6 +26,7 @@ int main(int argc, char const *argv[]) {
     const char *pcap_file  = argv[5]; 
     int block_size         = (argc > 6) ? atoi(argv[6]) : 256;
     int batch_size = (argc > 7) ? atoi(argv[7]) : 65536;
+    int n_slots    = (argc > 8) ? atoi(argv[8]) : 8;
 
     // 2. Setup de l'automate Aho-Corasick
     AC_Machine *m = ac_create();
@@ -53,12 +54,12 @@ int main(int argc, char const *argv[]) {
         );
     } 
     else if (strcmp(mode, "gpu_async") == 0) {
-        // Mode GPU Asynchronous (Double Buffering)
-        exec_time = run_buffering_packet_benchmark(
-            m, (const char*)pcapData->raw_data, (unsigned long*)pcapData->offsets, 
-            (int*)pcapData->sizes, pcapData->packet_count, loops, &total_matches, block_size, batch_size
-        );
-    }
+    exec_time = run_buffering_packet_benchmark(
+        m, (const char*)pcapData->raw_data, (unsigned long*)pcapData->offsets, 
+        (int*)pcapData->sizes, pcapData->packet_count, loops, &total_matches, 
+        block_size, batch_size, n_slots // Ajout de n_slots ici
+    );
+}
     else if (strcmp(mode, "cpu") == 0) {
         // Mode CPU Multi-thread (OpenMP)
         omp_set_num_threads(threads_or_param);

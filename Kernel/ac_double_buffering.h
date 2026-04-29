@@ -10,7 +10,7 @@ extern "C" {
 double run_buffering_packet_benchmark(const AC_Machine *m, const char *payload, 
                                       unsigned long *packet_offsets, int *packet_lengths, 
                                       int num_packets, int loops, long *out_matches, 
-                                      int threads_per_block, int batch_size);
+                                      int threads_per_block, int batch_size, int n_slots);
 
 #ifdef __cplusplus
 }
