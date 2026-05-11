@@ -1,16 +1,24 @@
 #include "cuda_utils.h"
-
-void print_gpu_specs() {
+extern "C" {
+/**
+ * Utility function to display the hardware characteristics of the GPU.
+ * This is crucial for verifying the available L2 cache and SM count
+ * before running performance benchmarks.
+ */
+void print_gpu_specs()
+{
     int deviceCount;
+    // Check how many CUDA-capable GPUs are available
     CUDA_CHECK(cudaGetDeviceCount(&deviceCount));
-    
-    if (deviceCount == 0) {
+
+    if (deviceCount == 0)
+    {
         printf("No CUDA devices found.\n");
         return;
     }
 
     cudaDeviceProp props;
-    CUDA_CHECK(cudaGetDeviceProperties(&props, 0)); 
+    CUDA_CHECK(cudaGetDeviceProperties(&props, 0));
 
     printf("\n==================================================");
     printf("\n   🚀 GPU HARDWARE SPECIFICATIONS");
@@ -19,7 +27,7 @@ void print_gpu_specs() {
     printf("\n  Compute Capability    : %d.%d", props.major, props.minor);
     printf("\n  Total Global Memory   : %.2f GB", (float)props.totalGlobalMem / (1024.0 * 1024.0 * 1024.0));
     printf("\n  Multiprocessors (SM)  : %d", props.multiProcessorCount);
-    printf("\n  Shared Mem per Block  : %zu KB", props.sharedMemPerBlock / 1024); 
+    printf("\n  Shared Mem per Block  : %zu KB", props.sharedMemPerBlock / 1024);
     printf("\n  L2 Cache Size         : %d KB", props.l2CacheSize / 1024);
     printf("\n==================================================\n\n");
-}
+}}

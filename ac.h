@@ -3,25 +3,31 @@
 
 #include <stdio.h>
 
-
 #define ALPHABET_SIZE 256
 
 // --- Structures ---
 
-
-typedef struct OutputNode {
+/**
+ * Temporary node for pattern IDs found at each state.
+ * Used only during the construction phase (Phase 1 & 2).
+ */
+typedef struct OutputNode
+{
     int pattern_id;
     struct OutputNode *next;
 } OutputNode;
 
 /**
- * AC_Machine: The main Aho-Corasick Deterministic Finite Automaton (DFA).
- * Performance Note: This structure uses a Compressed Sparse Row (CSR) 
+ * AC_Automata: The main Aho-Corasick Deterministic Finite Automaton (DFA).
+ * * Performance Note: To be GPU-friendly, we convert the linked lists of patterns
+ * into a "Flat" representation (similar to CSR - Compressed Sparse Row).
+ * This allows the GPU to access matches without following pointers.
  */
-typedef struct {
+typedef struct
+{
 
-    int *transition_table; 
-    
+    int *transition_table;
+
     // CSR (Compressed Sparse Row) representation for matches
     int *output_counts;
     int *output_indexes;
@@ -29,34 +35,41 @@ typedef struct {
 
     int total_outputs; // Total number of pattern occurrences in the machine
     int num_states;    // Current number of states in the DFA
-    int capacity;      // Allocated capacity for states (dynamic resizing)
-    
-    OutputNode **temp_outputs; 
-} AC_Machine;
+    int capacity;      // Allocated capacity for states
 
+    OutputNode **temp_outputs;
+} AC_Automata;
 
 /**
- * ac_create: Allocates and initializes the AC_Machine structure.
- * Returns a pointer to the root state (State 0).
+ * ac_create: Allocates and initializes the AC_Automata structure.
+ * Sets up the root state and initial memory buffers.
  */
-AC_Machine* ac_create();
-
-
-void ac_free(AC_Machine *m);
+AC_Automata *ac_create();
 
 /**
- * ac_add_pattern: Adds a new keyword to the trie.
- * @param m The machine pointer.
+ * ac_free: cleanup of all host memory buffers.
+ */
+void ac_free(AC_Automata *m);
+
+/**
+ * ac_add_pattern: Phase 1 - Builds the Tree.
+ * @param m The automaton pointer.
  * @param pattern The string to detect.
- * @param pattern_id A unique identifier for this rule.
+ * @param pattern_id A unique identifier for this rule/keyword.
  */
-void ac_add_pattern(AC_Machine *m, const char *pattern, int pattern_id);
+void ac_add_pattern(AC_Automata *m, const char *pattern, int pattern_id);
 
+/**
+ * ac_finalize: Phase 2 - Computes failure links and optimizes transitions.
+ * This function converts the Tree into a full DFA and flattens the output lists
+ * into a single contiguous memory block for maximum search performance.
+ */
+void ac_finalize(AC_Automata *m);
 
-// ac_finalize: Converter into a DFA and computes failure links. 
-void ac_finalize(AC_Machine *m);
-
-
-long ac_search_benchmark(const AC_Machine *m, const char *text, long len);
+/**
+ * ac_search_benchmark: Baseline CPU search function.
+ * Processes a text buffer of length 'len' and returns the total number of matches.
+ */
+long ac_search_benchmark(const AC_Automata *m, const char *text, long len);
 
 #endif

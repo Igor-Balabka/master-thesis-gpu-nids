@@ -48,7 +48,6 @@ run_and_average() {
 
     # STEP 1: Real throughput
     for (( i=1; i<=ITERATIONS; i++ )); do
-        # ---> CORRECTION ICI : Remplacement de "1" par "$slots" <---
         res=$("$TARGET" "$mode" "$slots" "$LOOPS" "$PATTERNS" "$DATA" "$block" "$batch" "$slots")        
         t=$(echo "$res" | grep "Time Elapsed" | awk -F': ' '{print $2}' | tr -d 's ')
         final_matches=$(echo "$res" | grep "Total Matches" | awk -F': ' '{print $2}' | tr -d ' ')
@@ -75,7 +74,6 @@ run_and_average() {
             --launch-count 1 \
             --csv \
             "$TARGET" "$mode" "$slots" 2 "$PATTERNS" "$DATA" "$block" "$batch" "$slots" 2>/dev/null)
-            # ---> CORRECTION ICI AUSSI : Remplacement de "1" par "$slots" <---
 
         kernel_lines=$(echo "$raw_ncu" | grep -E "ac_buffering_kernel|ac_classic_kernel")
 
