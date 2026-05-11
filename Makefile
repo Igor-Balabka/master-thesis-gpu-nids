@@ -35,6 +35,7 @@ cpu: $(TARGET)
 clean:
 	@echo "Removing files"
 	rm -f $(TARGET)
+	rm -f $(TEST_TARGET)
 	rm -f $(ALL_OBJS)
 	rm -f benchmark_results.csv
 	rm -f *.o Kernel/*.o
