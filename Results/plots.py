@@ -34,12 +34,19 @@ def generate_all_plots(csv_file):
 
     df = pd.read_csv(csv_file)
     df['Throughput_Gbps'] = pd.to_numeric(df['Throughput_Gbps'], errors='coerce')
-    df['Grid_Size_Num'] = pd.to_numeric(df['Grid_Size'], errors='coerce')
-    df['N_Buffer'] = pd.to_numeric(df['N_Buffer'], errors='coerce').fillna(0)
+    
+    df['Grid_Size_Num'] = pd.to_numeric(df['Batch_Size'], errors='coerce') # Batch_Size au lieu de Grid_Size
+    df['N_Buffer'] = pd.to_numeric(df['Slots'], errors='coerce').fillna(0) # Slots au lieu de N_Buffer
+    df['Param_Value'] = pd.to_numeric(df['Slots'], errors='coerce')        # Pour le CPU, Param_Value = Slots
+    
+    df_async_test = df[df['Mode'] == 'gpu_async']
+    if not df_async_test.empty:
+        v_min = df_async_test['Throughput_Gbps'].min()
+        v_max = df_async_test['Throughput_Gbps'].max()
+    else:
+        v_min, v_max = 0, 100 # Valeurs par défaut
 
-    v_min = df[df['Mode'] == 'gpu_async']['Throughput_Gbps'].min()
-    v_max = df[df['Mode'] == 'gpu_async']['Throughput_Gbps'].max()
-    cmap_choice = "YlGnBu" 
+    cmap_choice = "YlGnBu"
 
     # --- PLOT 1 ---
     plt.figure()
@@ -62,18 +69,24 @@ def generate_all_plots(csv_file):
 
     # --- PLOT 2 ---
     plt.figure()
-    plt.grid(True, which="both", linestyle='--', alpha=0.5)
+    plt.grid(True, which="both", linestyle='--', alpha=0.5) # alpha ajouté pour plus de clarté
     df_async = df[df['Mode'] == 'gpu_async'].sort_values('Grid_Size_Num')
-    sns.lineplot(data=df_async, x='Grid_Size_Num', y='Throughput_Gbps', hue='Block_Size', marker='o', palette='bright', linewidth=2.5)
+    
+    # Ajout de errorbar=None pour supprimer l'intervalle de confiance
+    sns.lineplot(data=df_async, x='Grid_Size_Num', y='Throughput_Gbps', 
+                 hue='Block_Size', marker='o', palette='bright', 
+                 linewidth=2.5, errorbar=None) 
+    
     plt.xscale('log', base=2)
     plt.gca().xaxis.set_major_formatter(ticker.ScalarFormatter())
     unique_batches = sorted(df_async['Grid_Size_Num'].unique())
     plt.xticks(unique_batches, [int(x) for x in unique_batches], rotation=45)
-    plt.title('GPU Async Performance Scaling (95% CI)', fontweight='bold')
+    
+    plt.title('GPU Async Performance Scaling', fontweight='bold') # Titre mis à jour
     plt.xlabel('Batch Size (Number of packets)')
     plt.ylabel('Throughput (Gbps)')
     plt.legend(title='Block Size', bbox_to_anchor=(1.05, 1), loc='upper left')
-    save_plot('02_GPU_Async_Scalability_CI')
+    save_plot('02_GPU_Async_Scalability_No_CI')
 
     # --- PLOT 3 ---
     plt.figure(figsize=(10, 8))
@@ -220,6 +233,109 @@ def generate_all_plots(csv_file):
     g.savefig("12_Global_Optimization_Matrix.png", dpi=300)
     g.savefig("12_Global_Optimization_Matrix.pdf")
     print("✅ Files created: 12_Global_Optimization_Matrix.png and .pdf")
+    
+    
+   # --- PLOT 13: Throughput & Cache Misses vs Block Size ---
+    plt.figure()
+    target_batch = 262144
+    df_plot = df[
+        (df['Mode'] == 'gpu_async') & 
+        (df['N_Buffer'] == 3) & 
+        (df['Grid_Size_Num'] == target_batch)
+    ].sort_values('Block_Size')
+    
+    if not df_plot.empty:
+        labels = df_plot['Block_Size'].astype(int).astype(str).tolist()
+        x = range(len(labels))
+        
+        fig, ax1 = plt.subplots()
+        plt.grid(True, linestyle='--', alpha=0.3)
+
+        # Axe 1 : Throughput (Barres)
+        color1 = 'tab:blue'
+        ax1.set_xlabel('Block Size (Threads per Block)')
+        ax1.set_ylabel('Throughput (Gbps)', color=color1, fontweight='bold')
+        bars = ax1.bar(x, df_plot['Throughput_Gbps'], color=color1, alpha=0.4, label='Throughput (Gbps)')
+        ax1.tick_params(axis='y', labelcolor=color1)
+        
+        # Axe 2 : Cache Misses (Lignes)
+        ax2 = ax1.twinx() 
+        color2 = 'tab:red'
+        ax2.set_ylabel('Cache Miss Rate (%)', color=color2, fontweight='bold')
+        ax2.plot(x, df_plot['L1_Miss_Pct'], marker='s', color='darkorange', label='L1 Miss Rate')
+        ax2.plot(x, df_plot['L2_Miss_Pct'], marker='o', color='tab:red', label='L2 Miss Rate')
+        ax2.tick_params(axis='y', labelcolor=color2)
+        ax2.set_ylim(-5, 115)
+
+        # Labels de données pour le Throughput
+        for bar in bars:
+            height = bar.get_height()
+            ax1.annotate(f'{height:.1f}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontweight='bold')
+
+        plt.xticks(x, labels)
+        plt.title(f'Performance vs. Memory Efficiency (Block Size)\nBatch: {target_batch}, N_Buffer: 3', fontweight='bold')
+        
+        # Fusion des légendes
+        lines, labels_l = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels_l + labels2, loc='upper left', fontsize='small')
+
+        save_plot('13_Throughput_Cache_BlockSize')
+        
+        
+        
+    # --- PLOT 14: Throughput & Cache Efficiency vs Batch Size (Harmonized Colors) ---
+    plt.figure()
+    target_block = 32
+    df_plot = df[
+        (df['Mode'] == 'gpu_async') & 
+        (df['N_Buffer'] == 3) & 
+        (df['Block_Size'] == target_block)
+    ].sort_values('Grid_Size_Num')
+    
+    if not df_plot.empty:
+        labels = df_plot['Grid_Size_Num'].astype(int).astype(str).tolist()
+        x = range(len(labels))
+        
+        fig, ax1 = plt.subplots()
+        plt.grid(True, linestyle='--', alpha=0.3)
+
+        # Axe 1 : Throughput (Barres Bleues comme le Plot 13)
+        color_tp = 'tab:blue'
+        ax1.set_xlabel('Batch Size (Packets)')
+        ax1.set_ylabel('Throughput (Gbps)', color=color_tp, fontweight='bold')
+        bars = ax1.bar(x, df_plot['Throughput_Gbps'], color=color_tp, alpha=0.4, label='Throughput (Gbps)')
+        ax1.tick_params(axis='y', labelcolor=color_tp)
+        
+        # Axe 2 : Cache Misses (Orange et Rouge comme le Plot 13)
+        ax2 = ax1.twinx()
+        color_miss = 'tab:red'
+        ax2.set_ylabel('Cache Miss Rate (%)', color=color_miss, fontweight='bold')
+        
+        # L1 en Orange, L2 en Rouge
+        ax2.plot(x, df_plot['L1_Miss_Pct'], marker='s', color='darkorange', linewidth=2, label='L1 Miss Rate')
+        ax2.plot(x, df_plot['L2_Miss_Pct'], marker='o', color='tab:red', linewidth=2, label='L2 Miss Rate')
+        
+        ax2.tick_params(axis='y', labelcolor=color_miss)
+        ax2.set_ylim(-5, 115)
+
+        for bar in bars:
+            height = bar.get_height()
+            ax1.annotate(f'{height:.1f}', xy=(bar.get_x() + bar.get_width() / 2, height),
+                        xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', 
+                        fontweight='bold', fontsize=9)
+
+        plt.xticks(x, labels, rotation=45)
+        plt.title(f'Performance vs. Memory Efficiency (Batch Size)\nBlock: {target_block}, N_Buffer: 3', fontweight='bold')
+        
+        lines, labels_l = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels_l + labels2, loc='upper left', fontsize='small', frameon=True, shadow=True)
+
+        save_plot('14_Throughput_Cache_BatchSize_Harmonized')
+    else:
+        print(f"⚠️ Skip Plot 14: No data for gpu_async with Block_Size={target_block} and N_Buffer=3")
 
 if __name__ == "__main__":
     generate_all_plots("benchmark_results.csv")
