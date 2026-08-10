@@ -40,35 +40,6 @@ __global__ void ac_buffering_kernel(
     d_results_at_offset[tid] = matches;
 }
 
-void prepare_packet_metadata(MbufPool *pool, unsigned long *h_packet_start, int *h_packet_lengths)
-{
-    for (int i = 0; i < pool->packet_count; i++)
-    {
-        h_packet_start[i] = (unsigned long)((char *)pool->mbuf_array[i].buf_addr - (char *)pool->mempool_data);
-        h_packet_lengths[i] = pool->mbuf_array[i].data_len;
-    }
-}
-
-// free data in the GPU
-void cleanup_gpu(int *d_table, int *d_output_counts, char *d_payload,
-                 unsigned long *d_packet_start, int *d_packet_lengths,
-                 long *d_results, cudaStream_t *streams, int n_slots)
-{
-    cudaFree(d_table);
-    cudaFree(d_output_counts);
-    cudaFree(d_payload);
-    cudaFree(d_packet_start);
-    cudaFree(d_packet_lengths);
-    cudaFree(d_results);
-
-    if (streams)
-    {
-        for (int i = 0; i < n_slots; i++)
-            cudaStreamDestroy(streams[i]);
-        free(streams);
-    }
-}
-
 extern "C"
 {
     double run_mbuf_benchmark(

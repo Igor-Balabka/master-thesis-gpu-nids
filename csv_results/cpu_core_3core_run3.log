@@ -1,0 +1,23 @@
+EAL: Detected CPU lcores: 12
+EAL: Detected NUMA nodes: 1
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+TELEMETRY: No legacy callbacks, legacy socket not created
+
+🚀 SELECTED MODE: PURE CPU MULTI-WORKERS [DPDK STREAMING] (3 allocated core(s), 1 RX Queue(s), 128 Batches/Queue)
+[Setup] 21145 patterns loaded from Rules/patterns.txt
+[DPDK Config] Configuring Port 0 with 1 RX Queue(s)...
+[Launch] Core 1 dedicated to DPDK capture (RX Queue 0)
+[Launch] Core 2 dedicated to CPU analysis worker
+
+==================================================
+📊 AUTO-ADAPTIVE NIDS BENCHMARK (PURE CPU MODE)
+==================================================
+Allocated Cores        : 3
+Active RX Queues       : 1
+Execution Time         : 7.3743 s
+Effective Throughput   : 5.57 Gbps 🚀
+AC Matches             : 24892829
+==================================================
+

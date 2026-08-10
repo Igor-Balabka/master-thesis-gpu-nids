@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "../payload.h"
 
 
 
@@ -16,6 +17,12 @@ extern "C" {
 #endif
 
 void print_gpu_specs();
+
+void prepare_packet_metadata(MbufPool *pool, unsigned long *h_packet_start, int *h_packet_lengths);
+
+void cleanup_gpu(int *d_table, int *d_output_counts, char *d_payload,
+                 unsigned long *d_packet_start, int *d_packet_lengths,
+                 long *d_results, cudaStream_t *streams, int n_slots);
 
 #ifdef __cplusplus
 }

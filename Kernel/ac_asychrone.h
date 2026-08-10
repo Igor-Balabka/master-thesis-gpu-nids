@@ -29,6 +29,15 @@ extern "C"
         int batch_size,
         int n_slots);
 
+    
+    double run_persistent_benchmark(
+        const AC_Automata *m, 
+        MbufPool *pool, 
+        int loops, 
+        long *out_matches,
+        int block_size, 
+        int batch_size, int n_slots);
+
 #ifdef __cplusplus
 }
 #endif
