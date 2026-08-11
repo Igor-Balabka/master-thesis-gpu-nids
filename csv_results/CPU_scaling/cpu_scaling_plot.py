@@ -53,7 +53,7 @@ df_stats = df_stats.fillna(0)
 # ------------------------------------------------------------------------------
 plt.figure(figsize=(10, 6))
 
-plt.plot(df_stats['cores'], df_stats['throughput_mean'], marker='o', color='#1f77b4', linewidth=2.5, markersize=8, label='Effective Throughput (Gbps)')
+plt.plot(df_stats['cores'], df_stats['throughput_mean'], marker='o', color='#1f77b4', linewidth=2.5, markersize=8, label='Throughput (Gbps)')
 plt.fill_between(df_stats['cores'], 
                  df_stats['throughput_mean'] - df_stats['throughput_std'], 
                  df_stats['throughput_mean'] + df_stats['throughput_std'], 
@@ -84,11 +84,11 @@ plt.close()
 plt.figure(figsize=(10, 6))
 
 # L3 Miss
-plt.plot(df_stats['cores'], df_stats['l3_mean'], marker='s', color='#d62728', linewidth=2, label='L3 / LLC Cache Miss Rate (%)')
+plt.plot(df_stats['cores'], df_stats['l3_mean'], marker='s', color='#d62728', linewidth=2, label='L3 Cache Miss Rate (%)')
 plt.fill_between(df_stats['cores'], df_stats['l3_mean'] - df_stats['l3_std'], df_stats['l3_mean'] + df_stats['l3_std'], color='#d62728', alpha=0.15)
 
 # L1D Miss
-plt.plot(df_stats['cores'], df_stats['l1d_mean'], marker='o', color='#ff7f0e', linewidth=2, label='L1D Cache Miss Rate (%)')
+plt.plot(df_stats['cores'], df_stats['l1d_mean'], marker='o', color='#ff7f0e', linewidth=2, label='L1 Cache Miss Rate (%)')
 plt.fill_between(df_stats['cores'], df_stats['l1d_mean'] - df_stats['l1d_std'], df_stats['l1d_mean'] + df_stats['l1d_std'], color='#ff7f0e', alpha=0.15)
 
 # L2 Miss
@@ -110,7 +110,7 @@ plt.close()
 # ------------------------------------------------------------------------------
 plt.figure(figsize=(10, 6))
 
-plt.plot(df_stats['cores'], df_stats['dram_bw_mean'], marker='D', color='#9467bd', linewidth=2.5, markersize=8, label='Effective DRAM Bandwidth (GB/s)')
+plt.plot(df_stats['cores'], df_stats['dram_bw_mean'], marker='D', color='#9467bd', linewidth=2.5, markersize=8, label='DRAM Bandwidth (GB/s)')
 plt.fill_between(df_stats['cores'], 
                  df_stats['dram_bw_mean'] - df_stats['dram_bw_std'], 
                  df_stats['dram_bw_mean'] + df_stats['dram_bw_std'], 
