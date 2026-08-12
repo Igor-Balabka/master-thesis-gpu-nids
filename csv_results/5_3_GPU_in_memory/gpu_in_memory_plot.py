@@ -1,0 +1,91 @@
+import os
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
+sns.set_theme(style="whitegrid")
+plt.rcParams.update({
+    'font.size': 12, 'font.family': 'sans-serif',
+    'axes.labelsize': 14, 'axes.titlesize': 16,
+    'figure.titlesize': 18, 'pdf.fonttype': 42
+})
+
+OUTPUT_DIR = "output_plots"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+PATH_GRID_SEARCH = "grid_search_results.csv"
+PATH_RUNS = "csv_results/GPU_in_memory/gpu_vram_results.csv"
+
+if os.path.exists(PATH_GRID_SEARCH):
+    df_grid = pd.read_csv(PATH_GRID_SEARCH)
+    required_cols = {"threads_per_block", "batch_size", "throughput_gbps"}
+    
+    if required_cols.issubset(df_grid.columns):
+        pivot = df_grid.pivot(
+            index="threads_per_block",
+            columns="batch_size",
+            values="throughput_gbps",
+        )
+
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(
+            pivot,
+            annot=True,
+            fmt=".1f",
+            cmap="YlGnBu",
+            cbar_kws={"label": "Throughput (Gbps)"},
+            linewidths=0.5,
+        )
+        plt.title("GPU In-Memory Aho-Corasick Throughput Grid Search", pad=15)
+        plt.xlabel("Batch Size (Number of Packets)")
+        plt.ylabel("Threads per Block")
+        plt.tight_layout()
+        plt.savefig(os.path.join(OUTPUT_DIR, "gpu_grid_search_heatmap.pdf"), format="pdf", bbox_inches="tight")
+        plt.close()
+
+if os.path.exists(PATH_GRID_SEARCH):
+    df_subset = df_grid[df_grid["threads_per_block"] == 32].sort_values("batch_size")
+    
+    if df_subset.empty:
+        df_subset = df_grid.groupby("batch_size")["throughput_gbps"].mean().reset_index()
+
+    batch_sizes = df_subset["batch_size"].tolist()
+    batch_labels = [f"{int(sz)} pkts" for sz in batch_sizes]
+    throughput = df_subset["throughput_gbps"].tolist()
+    
+    avg_payload_bytes = 512.0 
+    mpps = [(tp * 1e3) / (avg_payload_bytes * 8) for tp in throughput]
+
+    plt.figure(figsize=(10, 5))
+    bars = plt.bar(batch_labels, throughput, color='#1f77b4', alpha=0.8, width=0.5, zorder=3)
+    plt.ylabel("Throughput (Gbps)")
+    plt.xlabel("Batch Size (Number of Packets)")
+    plt.ylim(0, max(throughput) * 1.15)
+    plt.grid(True, linestyle="--", alpha=0.5, zorder=0)
+
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, yval + (max(throughput)*0.02), 
+                 f"{yval:.1f}", ha='center', fontweight='bold', fontsize=9)
+
+    plt.title("GPU Throughput scaling by Batch Size (Packets)", pad=15)
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "gpu_throughput_by_batch_size.pdf"), format="pdf")
+    plt.close()
+
+    plt.figure(figsize=(10, 5))
+    bars = plt.bar(batch_labels, mpps, color='#d62728', alpha=0.8, width=0.5, zorder=3)
+    plt.ylabel("Packet Processing Rate (Mpps)")
+    plt.xlabel("Batch Size (Number of Packets)")
+    plt.ylim(0, max(mpps) * 1.15)
+    plt.grid(True, linestyle="--", alpha=0.5, zorder=0)
+
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, yval + (max(mpps)*0.02), 
+                 f"{yval:.1f}", ha='center', fontweight='bold', fontsize=9)
+
+    plt.title("GPU Processing Rate (Mpps) by Batch Size (Packets)", pad=15)
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_DIR, "gpu_mpps_by_batch_size.pdf"), format="pdf")
+    plt.close()

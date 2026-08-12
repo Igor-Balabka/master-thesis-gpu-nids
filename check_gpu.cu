@@ -1,10 +1,11 @@
-
 #include <stdio.h>
 #include <cuda_runtime.h>
 
 int main() {
     cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
+    cudaGetDeviceProperties(&prop, 0); // Get info about GPU 0
+
+    // Print out GPU specs to check what hardware we are using
     printf("Device Name: %s\n", prop.name);
     printf("Compute Capability: %d.%d\n", prop.major, prop.minor);
     printf("Streaming Multiprocessors (SMs): %d\n", prop.multiProcessorCount);
@@ -12,5 +13,6 @@ int main() {
     printf("Max Threads per SM: %d\n", prop.maxThreadsPerMultiProcessor);
     printf("Shared Memory per Block: %zu KB\n", prop.sharedMemPerBlock / 1024);
     printf("Warp Size: %d\n", prop.warpSize);
+    
     return 0;
 }

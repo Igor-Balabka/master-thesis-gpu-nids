@@ -5,6 +5,7 @@
 
 #define INITIAL_CAPACITY 1000
 
+// Resize the automaton arrays when capacity is reached
 static void _ac_resize(AC_Automata *m) {
     int old_cap = m->capacity;
     int new_cap = old_cap * 2;
@@ -23,6 +24,7 @@ static void _ac_resize(AC_Automata *m) {
     m->capacity = new_cap;
 }
 
+// Add a temporary output pattern to a state
 static void _add_temp_output(AC_Automata *m, int state, int pattern_id) {
     OutputNode *head = m->temp_outputs[state];
     OutputNode *curr = head;
@@ -38,6 +40,7 @@ static void _add_temp_output(AC_Automata *m, int state, int pattern_id) {
     m->temp_outputs[state] = newNode;
 }
 
+// Initialize the Aho-Corasick automaton
 AC_Automata *ac_create(void) {
     AC_Automata *m = (AC_Automata *)malloc(sizeof(AC_Automata));
     m->capacity = INITIAL_CAPACITY;
@@ -54,6 +57,7 @@ AC_Automata *ac_create(void) {
     return m;
 }
 
+// Free all memory allocated for the automaton
 void ac_free(AC_Automata *m) {
     if (m) {
         free(m->transition_table);
@@ -75,6 +79,7 @@ void ac_free(AC_Automata *m) {
     }
 }
 
+// Add a single pattern to the trie
 void ac_add_pattern(AC_Automata *m, const char *pattern, int pattern_id) {
     int current_state = 0;
     int len = strlen(pattern);
@@ -95,6 +100,7 @@ void ac_add_pattern(AC_Automata *m, const char *pattern, int pattern_id) {
     _add_temp_output(m, current_state, pattern_id);
 }
 
+// Build failure links using BFS (Aho-Corasick finalize step)
 void ac_finalize(AC_Automata *m) {
     int *q = (int *)malloc(m->capacity * sizeof(int));
     int head = 0, tail = 0;
@@ -135,6 +141,7 @@ void ac_finalize(AC_Automata *m) {
     free(q);
     free(fail);
 
+    // Convert linked lists to flat arrays for better cache performance
     int total_outputs = 0;
     for (int i = 0; i < m->num_states; i++) {
         int count = 0;
@@ -161,6 +168,7 @@ void ac_finalize(AC_Automata *m) {
         }
     }
 
+    // Free temporary outputs
     for (int i = 0; i < m->num_states; i++) {
         OutputNode *curr = m->temp_outputs[i];
         while (curr) {
@@ -171,8 +179,20 @@ void ac_finalize(AC_Automata *m) {
     }
     free(m->temp_outputs);
     m->temp_outputs = NULL;
+
+    // Calculate total RAM usage
+    size_t trans_size = (size_t)m->capacity * ALPHABET_SIZE * sizeof(int);
+    size_t counts_size = (size_t)m->capacity * sizeof(int);
+    size_t indexes_size = (size_t)m->capacity * sizeof(int);
+    size_t list_size = (size_t)m->total_outputs * sizeof(int);
+    
+    size_t total_ram_bytes = trans_size + counts_size + indexes_size + list_size + sizeof(AC_Automata);
+    double cpu_ram_mb = (double)total_ram_bytes / (1024.0 * 1024.0);
+
+    printf("[CPU DFA Stats] States: %d | Total RAM: %.2f MB\n", m->num_states, cpu_ram_mb);
 }
 
+// Search text for patterns
 long ac_search_benchmark(const AC_Automata *m, const char *text, long len) {
     int current_state = 0;
     long total_matches = 0;
@@ -187,6 +207,7 @@ long ac_search_benchmark(const AC_Automata *m, const char *text, long len) {
     return total_matches;
 }
 
+// Load patterns from a file line by line
 void load_patterns(AC_Automata *m, const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) {
