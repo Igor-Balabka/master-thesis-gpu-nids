@@ -211,7 +211,7 @@ long ac_search_benchmark(const AC_Automata *m, const char *text, long len) {
 void load_patterns(AC_Automata *m, const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) {
-        fprintf(stderr, "❌ Error: Could not open rules file %s\n", filename);
+        fprintf(stderr, " Error: Could not open rules file %s\n", filename);
         exit(1);
     }
     char line[1024];
